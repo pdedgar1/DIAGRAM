@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>DIAGRAM — MFA Journal Map</title>
+
+  <!-- deck.gl + MapLibre GL (no API key required) -->
+  <script src="https://unpkg.com/deck.gl@9.0.0/dist.min.js"></script>
+  <script src="https://unpkg.com/maplibre-gl@4.4.0/dist/maplibre-gl.js"></script>
+  <link  href="https://unpkg.com/maplibre-gl@4.4.0/dist/maplibre-gl.css" rel="stylesheet" />
+
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: #0a0a0f;
+      color: #e8e4dc;
+      font-family: 'Georgia', serif;
+      overflow: hidden;
+      height: 100vh;
+    }
+
+    #map-container {
+      position: absolute;
+      inset: 0;
+    }
+
+    /* ── Header ────────────────────────────────────────────── */
+    #header {
+      position: absolute;
+      top: 18px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 10;
+      text-align: center;
+      pointer-events: none;
+    }
+    #header h1 {
+      font-size: 1.05rem;
+      letter-spacing: 0.28em;
+      text-transform: uppercase;
+      color: #e8e4dc;
+      text-shadow: 0 0 20px rgba(180,140,90,0.6);
+    }
+    #header p {
+      font-size: 0.65rem;
+      letter-spacing: 0.18em;
+      color: #8a8070;
+      margin-top: 4px;
+    }
+
+    /* ── Controls ───────────────────────────────────────────── */
+    #controls {
+      position: absolute;
+      bottom: 28px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 10;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .btn-row {
+      display: flex;
+      gap: 6px;
+    }
+
+    button {
+      background: rgba(18,16,12,0.82);
+      border: 1px solid rgba(200,170,100,0.25);
+      color: #c8b070;
+      font-family: 'Georgia', serif;
+      font-size: 0.62rem;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      padding: 5px 13px;
+      cursor: pointer;
+      border-radius: 2px;
+      transition: background 0.18s, border-color 0.18s, color 0.18s;
+    }
+    button:hover  { background: rgba(200,170,100,0.12); border-color: rgba(200,170,100,0.55); }
+    button.active { background: rgba(200,170,100,0.20); border-color: #c8b070; color: #f0e0b0; }
+
+    #mode-label {
+      font-size: 0.58rem;
+      letter-spacing: 0.2em;
+      color: #5a5040;
+      text-transform: uppercase;
+    }
+
+    /* ── Tooltip ────────────────────────────────────────────── */
+    #tooltip {
+      position: absolute;
+      z-index: 20;
+      pointer-events: none;
+      background: rgba(10,9,6,0.92);
+      border: 1px solid rgba(200,170,100,0.3);
+      border-radius: 3px;
+      padding: 10px 14px;
+      max-width: 220px;
+      display: none;
+    }
+    #tooltip .tt-name {
+      font-size: 0.8rem;
+      letter-spacing: 0.08em;
+      color: #f0e0b0;
+      margin-bottom: 4px;
+    }
+    #tooltip .tt-inst {
+      font-size: 0.62rem;
+      color: #8a7a5a;
+      margin-bottom: 8px;
+      line-height: 1.4;
+    }
+    #tooltip .tt-total {
+      font-size: 0.72rem;
+      color: #c8b070;
+      margin-bottom: 6px;
+    }
+    #tooltip .tt-bar-wrap {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+    #tooltip .tt-period {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.58rem;
+      color: #6a5a3a;
+      letter-spacing: 0.06em;
+    }
+    #tooltip .tt-period .bar {
+      height: 6px;
+      background: #c8b070;
+      border-radius: 1px;
+      min-width: 2px;
+    }
+    #tooltip .tt-period .val {
+      color: #a09060;
+    }
+
+    /* ── Legend ─────────────────────────────────────────────── */
+    #legend {
+      position: absolute;
+      top: 18px;
+      right: 18px;
+      z-index: 10;
+      font-size: 0.58rem;
+      letter-spacing: 0.1em;
+      color: #6a5a3a;
+    }
+    #legend .lg-title { color: #8a7a5a; margin-bottom: 5px; text-transform: uppercase; }
+    #legend .lg-row   { display: flex; align-items: center; gap: 6px; margin-bottom: 3px; }
+    #legend .dot      { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+  </style>
+</head>
+<body>
+
+<div id="map-container"></div>
+
+<div id="header">
+  <h1>DIAGRAM &nbsp;·&nbsp; MFA Journal Map</h1>
+  <p>appearances across 146 issues &nbsp;·&nbsp; years 1 – 25</p>
+</div>
+
+<div id="tooltip">
+  <div class="tt-name" id="tt-name"></div>
+  <div class="tt-inst" id="tt-inst"></div>
+  <div class="tt-total" id="tt-total"></div>
+  <div class="tt-bar-wrap" id="tt-bars"></div>
+</div>
+
+<div id="controls">
+  <div class="btn-row" id="period-btns">
+    <button class="active" data-period="all">All Years</button>
+    <button data-period="1–5">Yrs 1–5</button>
+    <button data-period="6–10">Yrs 6–10</button>
+    <button data-period="11–15">Yrs 11–15</button>
+    <button data-period="16–20">Yrs 16–20</button>
+    <button data-period="21–25">Yrs 21–25</button>
+  </div>
+  <div class="btn-row">
+    <button id="btn-columns" class="active">Relief spikes</button>
+    <button id="btn-heat">Heat map</button>
+    <button id="btn-both">Both</button>
+  </div>
+  <div id="mode-label">drag to pan &nbsp;·&nbsp; scroll to zoom &nbsp;·&nbsp; right-drag to tilt</div>
+</div>
+
+<div id="legend">
+  <div class="lg-title">Appearances</div>
+  <div class="lg-row"><div class="dot" style="background:#1a2a6c"></div><span>1 – 15</span></div>
+  <div class="lg-row"><div class="dot" style="background:#b21f1f"></div><span>16 – 40</span></div>
+  <div class="lg-row"><div class="dot" style="background:#fdbb2d"></div><span>41 – 80</span></div>
+  <div class="lg-row"><div class="dot" style="background:#ffffff"></div><span>81 +</span></div>
+</div>
+
+<script>
+const { DeckGL, ColumnLayer, HeatmapLayer, TextLayer } = deck;
+
+const PERIODS   = ["1–5", "6–10", "11–15", "16–20", "21–25"];
+const TILE_URL  =
+  "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json";
+
+// ── State ──────────────────────────────────────────────────────────────────
+let allData     = [];
+let activePeriod= "all";
+let activeMode  = "columns"; // "columns" | "heat" | "both"
+let deckgl      = null;
+
+// ── Colour scale (low→high): navy → crimson → gold → white ────────────────
+function countToColor(count, maxCount) {
+  const t = Math.min(count / maxCount, 1);
+  // 3-stop gradient: navy(0) → crimson(0.45) → gold(0.75) → white(1)
+  if (t < 0.45) {
+    const u = t / 0.45;
+    return [
+      Math.round(26  + u * (178 - 26)),
+      Math.round(42  + u * (31  - 42)),
+      Math.round(108 + u * (31  - 108)),
+      220
+    ];
+  } else if (t < 0.75) {
+    const u = (t - 0.45) / 0.30;
+    return [
+      Math.round(178 + u * (253 - 178)),
+      Math.round(31  + u * (187 - 31)),
+      Math.round(31  + u * (45  - 31)),
+      220
+    ];
+  } else {
+    const u = (t - 0.75) / 0.25;
+    return [
+      Math.round(253 + u * (255 - 253)),
+      Math.round(187 + u * (255 - 187)),
+      Math.round(45  + u * (255 - 45)),
+      220
+    ];
+  }
+}
+
+function getCount(j) {
+  return activePeriod === "all" ? j.total : (j.by_period[activePeriod] || 0);
+}
+
+// ── Tooltip ────────────────────────────────────────────────────────────────
+const ttEl    = document.getElementById("tooltip");
+const ttName  = document.getElementById("tt-name");
+const ttInst  = document.getElementById("tt-inst");
+const ttTotal = document.getElementById("tt-total");
+const ttBars  = document.getElementById("tt-bars");
+
+function showTooltip(info, event) {
+  if (!info || !info.object) { ttEl.style.display = "none"; return; }
+  const j = info.object;
+  const c = getCount(j);
+  const maxPeriod = Math.max(...PERIODS.map(p => j.by_period[p] || 0), 1);
+
+  ttName.textContent  = j.name;
+  ttInst.textContent  = `${j.institution}\n${j.city}, ${j.state}`;
+  ttTotal.textContent = `${c} appearance${c !== 1 ? "s" : ""}${activePeriod !== "all" ? ` (yrs ${activePeriod})` : " (total)"}`;
+
+  ttBars.innerHTML = PERIODS.map(p => {
+    const v   = j.by_period[p] || 0;
+    const w   = Math.round((v / maxPeriod) * 80);
+    return `<div class="tt-period">
+      <span style="width:36px;text-align:right">Yrs ${p}</span>
+      <div class="bar" style="width:${w}px"></div>
+      <span class="val">${v}</span>
+    </div>`;
+  }).join("");
+
+  const x = event.center ? event.center.x : (event.clientX || 0);
+  const y = event.center ? event.center.y : (event.clientY || 0);
+  ttEl.style.left    = (x + 16) + "px";
+  ttEl.style.top     = (y - 20) + "px";
+  ttEl.style.display = "block";
+}
+
+// ── Build deck.gl layers ───────────────────────────────────────────────────
+function buildLayers(data) {
+  const counts   = data.map(getCount);
+  const maxCount = Math.max(...counts, 1);
+
+  const columnLayer = new ColumnLayer({
+    id:               "columns",
+    data,
+    diskResolution:   24,
+    radius:           28000,
+    extruded:         true,
+    pickable:         true,
+    getPosition:      d => [d.lng, d.lat],
+    getElevation:     d => {
+      const c = getCount(d);
+      return c === 0 ? 0 : 20000 + (c / maxCount) * 480000;
+    },
+    getFillColor:     d => countToColor(getCount(d), maxCount),
+    getLineColor:     [0, 0, 0, 0],
+    elevationScale:   1,
+    material: {
+      ambient:  0.35,
+      diffuse:  0.6,
+      shininess: 32,
+      specularColor: [120, 100, 50]
+    },
+    onHover: showTooltip,
+    updateTriggers: { getElevation: [activePeriod], getFillColor: [activePeriod] }
+  });
+
+  // Heatmap uses weight = count
+  const heatLayer = new HeatmapLayer({
+    id:          "heat",
+    data:        data.filter(d => getCount(d) > 0),
+    getPosition: d => [d.lng, d.lat],
+    getWeight:   d => getCount(d),
+    radiusPixels: 80,
+    intensity:    1.4,
+    threshold:    0.05,
+    colorRange: [
+      [0,   0,  80, 0],
+      [26,  42, 108,180],
+      [178, 31,  31, 220],
+      [253,187,  45, 240],
+      [255,255, 200, 255],
+    ],
+    updateTriggers: { getWeight: [activePeriod] }
+  });
+
+  const layers = [];
+  if (activeMode === "columns" || activeMode === "both") layers.push(columnLayer);
+  if (activeMode === "heat"    || activeMode === "both") layers.push(heatLayer);
+  return layers;
+}
+
+function render() {
+  if (!deckgl) return;
+  deckgl.setProps({ layers: buildLayers(allData) });
+}
+
+// ── Initialise ─────────────────────────────────────────────────────────────
+fetch("data.json")
+  .then(r => r.json())
+  .then(({ journals }) => {
+    allData = journals;
+
+    deckgl = new DeckGL({
+      container:         "map-container",
+      map:               maplibregl,
+      mapStyle:          TILE_URL,
+      initialViewState: {
+        longitude:  -96,
+        latitude:    40,
+        zoom:         3.6,
+        pitch:        48,
+        bearing:      -8,
+      },
+      controller:        true,
+      layers:            buildLayers(journals),
+      getTooltip:        null,  // we handle hover manually via onHover
+    });
+  });
+
+// ── UI wiring ──────────────────────────────────────────────────────────────
+document.getElementById("period-btns").addEventListener("click", e => {
+  const btn = e.target.closest("button");
+  if (!btn) return;
+  document.querySelectorAll("#period-btns button").forEach(b => b.classList.remove("active"));
+  btn.classList.add("active");
+  activePeriod = btn.dataset.period;
+  render();
+});
+
+document.getElementById("btn-columns").addEventListener("click", () => {
+  activeMode = "columns";
+  document.getElementById("btn-columns").classList.add("active");
+  document.getElementById("btn-heat").classList.remove("active");
+  document.getElementById("btn-both").classList.remove("active");
+  render();
+});
+document.getElementById("btn-heat").addEventListener("click", () => {
+  activeMode = "heat";
+  document.getElementById("btn-columns").classList.remove("active");
+  document.getElementById("btn-heat").classList.add("active");
+  document.getElementById("btn-both").classList.remove("active");
+  render();
+});
+document.getElementById("btn-both").addEventListener("click", () => {
+  activeMode = "both";
+  document.getElementById("btn-columns").classList.remove("active");
+  document.getElementById("btn-heat").classList.remove("active");
+  document.getElementById("btn-both").classList.add("active");
+  render();
+});
+</script>
+</body>
+</html>
