@@ -1,0 +1,2 @@
+#MFAJOURNAL ColumbiaCollege Chicago
+#corollary 

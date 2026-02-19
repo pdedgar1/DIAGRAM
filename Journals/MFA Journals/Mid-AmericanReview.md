@@ -1,0 +1,2 @@
+#MFAJOURNAL 
+Bowling Green state 

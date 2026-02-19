@@ -1,0 +1,3 @@
+#MFAJOURNAL 
+Brooklyn CUNY
+

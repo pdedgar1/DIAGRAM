@@ -1,0 +1,208 @@
+{
+  "main": {
+    "id": "1e3860baa4ff653c",
+    "type": "split",
+    "children": [
+      {
+        "id": "ca8e6fa0c9249916",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "bd54fe1701241252",
+            "type": "leaf",
+            "state": {
+              "type": "empty",
+              "state": {},
+              "icon": "lucide-file",
+              "title": "New tab"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "vertical"
+  },
+  "left": {
+    "id": "dbbeb33c518f1a92",
+    "type": "split",
+    "children": [
+      {
+        "id": "0e895a3d1828e620",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "7a71577f0a1ef666",
+            "type": "leaf",
+            "state": {
+              "type": "search",
+              "state": {
+                "query": "tag:#MFAJOURNAL  ",
+                "matchingCase": false,
+                "explainSearch": false,
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical"
+              },
+              "icon": "lucide-search",
+              "title": "Search"
+            }
+          },
+          {
+            "id": "d904fd21466d49ab",
+            "type": "leaf",
+            "state": {
+              "type": "bookmarks",
+              "state": {},
+              "icon": "lucide-bookmark",
+              "title": "Bookmarks"
+            }
+          },
+          {
+            "id": "7eec462994db7e3a",
+            "type": "leaf",
+            "state": {
+              "type": "file-explorer",
+              "state": {
+                "sortOrder": "alphabetical",
+                "autoReveal": false
+              },
+              "icon": "lucide-folder-closed",
+              "title": "Files"
+            }
+          }
+        ],
+        "currentTab": 2
+      }
+    ],
+    "direction": "horizontal",
+    "width": 433.5
+  },
+  "right": {
+    "id": "bbc96e8ab00cd176",
+    "type": "split",
+    "children": [
+      {
+        "id": "53dd8e8aa84de103",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "aca07d87b5c7802a",
+            "type": "leaf",
+            "state": {
+              "type": "backlink",
+              "state": {
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical",
+                "showSearch": false,
+                "searchQuery": "",
+                "backlinkCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-coming-in",
+              "title": "Backlinks"
+            }
+          },
+          {
+            "id": "e2fcc1fce485f310",
+            "type": "leaf",
+            "state": {
+              "type": "outgoing-link",
+              "state": {
+                "linksCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-going-out",
+              "title": "Outgoing links"
+            }
+          },
+          {
+            "id": "135bdca83f627041",
+            "type": "leaf",
+            "state": {
+              "type": "tag",
+              "state": {
+                "sortOrder": "frequency",
+                "useHierarchy": true,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-tags",
+              "title": "Tags"
+            }
+          },
+          {
+            "id": "651eea135e24cd14",
+            "type": "leaf",
+            "state": {
+              "type": "outline",
+              "state": {
+                "followCursor": false,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-list",
+              "title": "Outline"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300,
+    "collapsed": true
+  },
+  "left-ribbon": {
+    "hiddenItems": {
+      "bases:Create new base": false,
+      "switcher:Open quick switcher": false,
+      "graph:Open graph view": false,
+      "canvas:Create new canvas": false,
+      "daily-notes:Open today's daily note": false,
+      "templates:Insert template": false,
+      "command-palette:Open command palette": false
+    }
+  },
+  "active": "7eec462994db7e3a",
+  "lastOpenFiles": [
+    "Journals/Conduit.md",
+    "Journals/BenningtonReview.md",
+    "Journals/Octopus.md",
+    "Untitled.md",
+    "Journals/ForkliftOhio.md",
+    "CopperNickel.md",
+    "Believer.md",
+    "Journals/MFA Journals/12thStreet.md",
+    "Journals/MFA Journals/YalobushaReview.md",
+    "Journals/WesternHumanitiesReview.md",
+    "Journals/Wigleaf.md",
+    "Journals/WestBranch.md",
+    "Journals/MFA Journals/WillowSprings.md",
+    "Journals/Witness.md",
+    "Journals/WordforWord.md",
+    "Journals/WordRiot.md",
+    "Journals/Brevity.md",
+    "Journals/BeloitPoetryJournal.md",
+    "Journals/BarrowStreet.md",
+    "Journals/AlaskaQuarterlyReview.md",
+    "Journals/42Opus.md",
+    "Journals/32Poems.md",
+    "Journals/3AMMagazine.md",
+    "Journals/Entropy.md",
+    "Journals/elimae.md",
+    "Journals/ElectricLiterature.md",
+    "Journals/Defunct Journals",
+    "Journals/Online Magazines",
+    "Journals/MFA Journals",
+    "Journals/Best Of _ & Awards",
+    "Journals/Anthologies",
+    "Issues/Years 21-25",
+    "Issues/Years 16-20",
+    "Issues/Years 11-15",
+    "Issues/Years 6-10",
+    "Issues/Years 1-5",
+    "Untitled.canvas",
+    "Untitled 2.canvas",
+    "Untitled 1.canvas"
+  ]
+}

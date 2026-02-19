@@ -1,0 +1,2 @@
+#MFAJOURNAL 
+Hamline University Minnesota

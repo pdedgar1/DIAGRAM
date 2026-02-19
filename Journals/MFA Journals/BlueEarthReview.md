@@ -1,0 +1,3 @@
+#MFAJOURNAL 
+Minn State
+Mankato
