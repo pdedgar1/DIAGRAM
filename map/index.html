@@ -164,7 +164,7 @@
 
 <div id="header">
   <h1>DIAGRAM &nbsp;·&nbsp; MFA Journal Map</h1>
-  <p>appearances across 146 issues &nbsp;·&nbsp; years 1 – 25</p>
+  <p id="header-sub">appearances across 146 issues &nbsp;·&nbsp; years 1 – 25</p>
 </div>
 
 <div id="tooltip">
@@ -200,22 +200,27 @@
 </div>
 
 <script>
-const { DeckGL, ColumnLayer, HeatmapLayer, TextLayer } = deck;
+// ── deck.gl imports ────────────────────────────────────────────────────────
+// HeatmapLayer lives under deck.HeatmapLayer in v9's standalone bundle;
+// guard against it being absent rather than crashing buildLayers().
+const { DeckGL, ColumnLayer, GeoJsonLayer } = deck;
+const HeatmapLayer = deck.HeatmapLayer || null;
 
-const PERIODS   = ["1–5", "6–10", "11–15", "16–20", "21–25"];
-const TILE_URL  =
-  "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json";
+const PERIODS  = ["1–5", "6–10", "11–15", "16–20", "21–25"];
+const TILE_URL = "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json";
+// WGS-84 GeoJSON (lat/lng) — required for deck.gl; us-atlas uses projected px coords
+const US_STATES_URL = "https://cdn.jsdelivr.net/gh/PublicaMundi/MappingAPI@master/data/geojson/us-states.json";
 
 // ── State ──────────────────────────────────────────────────────────────────
-let allData     = [];
-let activePeriod= "all";
-let activeMode  = "columns"; // "columns" | "heat" | "both"
-let deckgl      = null;
+let allData      = [];
+let usStatesGeo  = null;   // GeoJSON FeatureCollection (WGS-84) for state fills + lines
+let activePeriod = "all";
+let activeMode   = "columns"; // "columns" | "heat" | "both"
+let deckgl       = null;
 
 // ── Colour scale (low→high): navy → crimson → gold → white ────────────────
 function countToColor(count, maxCount) {
   const t = Math.min(count / maxCount, 1);
-  // 3-stop gradient: navy(0) → crimson(0.45) → gold(0.75) → white(1)
   if (t < 0.45) {
     const u = t / 0.45;
     return [
@@ -247,6 +252,15 @@ function getCount(j) {
   return activePeriod === "all" ? j.total : (j.by_period[activePeriod] || 0);
 }
 
+// ── Header subtitle ────────────────────────────────────────────────────────
+function updateHeader() {
+  const label = activePeriod === "all"
+    ? "years 1 – 25"
+    : `years ${activePeriod}`;
+  document.getElementById("header-sub").innerHTML =
+    `appearances across 146 issues &nbsp;·&nbsp; ${label}`;
+}
+
 // ── Tooltip ────────────────────────────────────────────────────────────────
 const ttEl    = document.getElementById("tooltip");
 const ttName  = document.getElementById("tt-name");
@@ -261,21 +275,23 @@ function showTooltip(info, event) {
   const maxPeriod = Math.max(...PERIODS.map(p => j.by_period[p] || 0), 1);
 
   ttName.textContent  = j.name;
-  ttInst.textContent  = `${j.institution}\n${j.city}, ${j.state}`;
-  ttTotal.textContent = `${c} appearance${c !== 1 ? "s" : ""}${activePeriod !== "all" ? ` (yrs ${activePeriod})` : " (total)"}`;
+  ttInst.textContent  = `${j.institution} · ${j.city}, ${j.state}`;
+  ttTotal.textContent =
+    `${c} appearance${c !== 1 ? "s" : ""}` +
+    (activePeriod !== "all" ? ` (yrs ${activePeriod})` : " (all years)");
 
   ttBars.innerHTML = PERIODS.map(p => {
-    const v   = j.by_period[p] || 0;
-    const w   = Math.round((v / maxPeriod) * 80);
+    const v = j.by_period[p] || 0;
+    const w = Math.round((v / maxPeriod) * 80);
     return `<div class="tt-period">
-      <span style="width:36px;text-align:right">Yrs ${p}</span>
-      <div class="bar" style="width:${w}px"></div>
+      <span style="width:40px;text-align:right">Yrs ${p}</span>
+      <div class="bar" style="width:${Math.max(w,2)}px"></div>
       <span class="val">${v}</span>
     </div>`;
   }).join("");
 
-  const x = event.center ? event.center.x : (event.clientX || 0);
-  const y = event.center ? event.center.y : (event.clientY || 0);
+  const x = info.x ?? (event?.clientX ?? 0);
+  const y = info.y ?? (event?.clientY ?? 0);
   ttEl.style.left    = (x + 16) + "px";
   ttEl.style.top     = (y - 20) + "px";
   ttEl.style.display = "block";
@@ -285,54 +301,88 @@ function showTooltip(info, event) {
 function buildLayers(data) {
   const counts   = data.map(getCount);
   const maxCount = Math.max(...counts, 1);
+  const layers   = [];
 
-  const columnLayer = new ColumnLayer({
-    id:               "columns",
-    data,
-    diskResolution:   24,
-    radius:           28000,
-    extruded:         true,
-    pickable:         true,
-    getPosition:      d => [d.lng, d.lat],
-    getElevation:     d => {
-      const c = getCount(d);
-      return c === 0 ? 0 : 20000 + (c / maxCount) * 480000;
-    },
-    getFillColor:     d => countToColor(getCount(d), maxCount),
-    getLineColor:     [0, 0, 0, 0],
-    elevationScale:   1,
-    material: {
-      ambient:  0.35,
-      diffuse:  0.6,
-      shininess: 32,
-      specularColor: [120, 100, 50]
-    },
-    onHover: showTooltip,
-    updateTriggers: { getElevation: [activePeriod], getFillColor: [activePeriod] }
-  });
+  // ── 1. US state fills (very subtle warm dark tone) ─────────────────────
+  if (usStatesGeo) {
+    layers.push(new GeoJsonLayer({
+      id:                  "us-states-fill",
+      data:                usStatesGeo,
+      stroked:             false,
+      filled:              true,
+      getFillColor:        [28, 20, 12, 210],
+      pickable:            false,
+    }));
+  }
 
-  // Heatmap uses weight = count
-  const heatLayer = new HeatmapLayer({
-    id:          "heat",
-    data:        data.filter(d => getCount(d) > 0),
-    getPosition: d => [d.lng, d.lat],
-    getWeight:   d => getCount(d),
-    radiusPixels: 80,
-    intensity:    1.4,
-    threshold:    0.05,
-    colorRange: [
-      [0,   0,  80, 0],
-      [26,  42, 108,180],
-      [178, 31,  31, 220],
-      [253,187,  45, 240],
-      [255,255, 200, 255],
-    ],
-    updateTriggers: { getWeight: [activePeriod] }
-  });
+  // ── 2. US state boundary lines ─────────────────────────────────────────
+  if (usStatesGeo) {
+    layers.push(new GeoJsonLayer({
+      id:                  "us-states-lines",
+      data:                usStatesGeo,
+      stroked:             true,
+      filled:              false,
+      getLineColor:        [95, 72, 38, 200],
+      getLineWidth:        800,
+      lineWidthMinPixels:  0.5,
+      lineWidthMaxPixels:  1.5,
+      pickable:            false,
+    }));
+  }
 
-  const layers = [];
-  if (activeMode === "columns" || activeMode === "both") layers.push(columnLayer);
-  if (activeMode === "heat"    || activeMode === "both") layers.push(heatLayer);
+  // ── 3. Relief spikes (ColumnLayer) ────────────────────────────────────
+  // Period-specific ID forces full re-creation when the period changes,
+  // guaranteeing all accessor functions are re-evaluated.
+  if (activeMode === "columns" || activeMode === "both") {
+    layers.push(new ColumnLayer({
+      id:             `columns-${activePeriod}`,
+      data:           data.filter(d => getCount(d) > 0),
+      diskResolution: 24,
+      radius:         28000,
+      extruded:       true,
+      pickable:       true,
+      getPosition:    d => [d.lng, d.lat],
+      getElevation:   d => {
+        const c = getCount(d);
+        return c === 0 ? 0 : 20000 + (c / maxCount) * 480000;
+      },
+      getFillColor:   d => countToColor(getCount(d), maxCount),
+      getLineColor:   [0, 0, 0, 0],
+      elevationScale: 1,
+      material: {
+        ambient:       0.35,
+        diffuse:       0.6,
+        shininess:     32,
+        specularColor: [120, 100, 50],
+      },
+      onHover: showTooltip,
+    }));
+  }
+
+  // ── 4. Heatmap layer ───────────────────────────────────────────────────
+  if (HeatmapLayer && (activeMode === "heat" || activeMode === "both")) {
+    try {
+      layers.push(new HeatmapLayer({
+        id:           `heat-${activePeriod}`,
+        data:         data.filter(d => getCount(d) > 0),
+        getPosition:  d => [d.lng, d.lat],
+        getWeight:    d => getCount(d),
+        radiusPixels: 90,
+        intensity:    1.5,
+        threshold:    0.05,
+        colorRange: [
+          [0,   0,   80,   0],
+          [26,  42,  108, 180],
+          [178, 31,  31,  220],
+          [253, 187, 45,  240],
+          [255, 255, 200, 255],
+        ],
+      }));
+    } catch (e) {
+      console.warn("HeatmapLayer failed:", e);
+    }
+  }
+
   return layers;
 }
 
@@ -341,28 +391,29 @@ function render() {
   deckgl.setProps({ layers: buildLayers(allData) });
 }
 
-// ── Initialise ─────────────────────────────────────────────────────────────
-fetch("data.json")
-  .then(r => r.json())
-  .then(({ journals }) => {
-    allData = journals;
+// ── Initialise: load journal data + US states GeoJSON in parallel ──────────
+Promise.all([
+  fetch("data.json").then(r => r.json()),
+  fetch(US_STATES_URL).then(r => r.json()),
+]).then(([{ journals }, statesGeo]) => {
+  allData     = journals;
+  usStatesGeo = statesGeo;   // already WGS-84, no projection conversion needed
 
-    deckgl = new DeckGL({
-      container:         "map-container",
-      map:               maplibregl,
-      mapStyle:          TILE_URL,
-      initialViewState: {
-        longitude:  -96,
-        latitude:    40,
-        zoom:         3.6,
-        pitch:        48,
-        bearing:      -8,
-      },
-      controller:        true,
-      layers:            buildLayers(journals),
-      getTooltip:        null,  // we handle hover manually via onHover
-    });
+  deckgl = new DeckGL({
+    container:        "map-container",
+    map:              maplibregl,
+    mapStyle:         TILE_URL,
+    initialViewState: {
+      longitude: -96,
+      latitude:   40,
+      zoom:        3.6,
+      pitch:       48,
+      bearing:     -8,
+    },
+    controller: true,
+    layers:     buildLayers(journals),
   });
+});
 
 // ── UI wiring ──────────────────────────────────────────────────────────────
 document.getElementById("period-btns").addEventListener("click", e => {
@@ -371,30 +422,20 @@ document.getElementById("period-btns").addEventListener("click", e => {
   document.querySelectorAll("#period-btns button").forEach(b => b.classList.remove("active"));
   btn.classList.add("active");
   activePeriod = btn.dataset.period;
+  updateHeader();
   render();
 });
 
-document.getElementById("btn-columns").addEventListener("click", () => {
-  activeMode = "columns";
-  document.getElementById("btn-columns").classList.add("active");
-  document.getElementById("btn-heat").classList.remove("active");
-  document.getElementById("btn-both").classList.remove("active");
+function setMode(mode) {
+  activeMode = mode;
+  ["btn-columns", "btn-heat", "btn-both"].forEach(id => {
+    document.getElementById(id).classList.toggle("active", id === `btn-${mode}`);
+  });
   render();
-});
-document.getElementById("btn-heat").addEventListener("click", () => {
-  activeMode = "heat";
-  document.getElementById("btn-columns").classList.remove("active");
-  document.getElementById("btn-heat").classList.add("active");
-  document.getElementById("btn-both").classList.remove("active");
-  render();
-});
-document.getElementById("btn-both").addEventListener("click", () => {
-  activeMode = "both";
-  document.getElementById("btn-columns").classList.remove("active");
-  document.getElementById("btn-heat").classList.remove("active");
-  document.getElementById("btn-both").classList.add("active");
-  render();
-});
+}
+document.getElementById("btn-columns").addEventListener("click", () => setMode("columns"));
+document.getElementById("btn-heat").addEventListener("click",    () => setMode("heat"));
+document.getElementById("btn-both").addEventListener("click",    () => setMode("both"));
 </script>
 </body>
 </html>
